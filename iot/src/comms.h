@@ -16,7 +16,7 @@ String topicBuffer;
 
 // MQTT Broker configuration (Default MQTT port is 1883)
 const char* mqttServer = "192.168.1.116";  
-const int mqttPort = 1883;
+const int mqttPort = 5883;
 
 unsigned long lastUpdate = 0;
 const unsigned long updateInterval = 5000; // Interval between periodic updates (5000 ms)
@@ -106,7 +106,9 @@ void mqttConnect()
         {
             Serial.println("Connected to MQTT broker.");
             client.subscribe(mqttTopic);
-            sendDataToServer("EventLog", String(mqttClient) + " is online.");
+            topicBuffer = "EventLog/" + String(mqttClient);
+            mqttTopic = topicBuffer.c_str();
+            sendDataToServer(mqttTopic, String(mqttClient) + " is online.");
         }
         else
         {
