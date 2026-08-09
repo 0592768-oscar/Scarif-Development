@@ -38,12 +38,17 @@ void setup()
         delay(10);
     }
     delay(1000);
+
+    randomSeed(analogRead(A0));
 }
 
 void loop()
 {
     // 1. Maintain connection to the broker
     mqttConnect();
+
+    int randomNumber = random(1, 100000);
+    sendPeriodicUpdate("sensorData", String(randomNumber));
 
     // 2. Transmit periodic telemetry (if required by design specification)
     unsigned long now = millis();
