@@ -10,8 +10,8 @@ services:
     environment:
       # Direct connections over the network to the central server
       # Instruct students to adjust this to the teacher's static classroom server IP
-      - DB_HOST=192.168.1.100
-      - DB_PORT=3306
+      - DB_HOST=10.177.206.126
+      - DB_PORT=5306
       - DB_NAME=telemetry_db
       - DB_USER=student_user
       - DB_PASSWORD=Password123!
