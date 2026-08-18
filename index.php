@@ -18,18 +18,26 @@ $connected = false;
 $errorMsg = "";
 $readings = [];
 
+$selectedDevice = isset($_GET['device_id']) ? trim($_GET['device_id']) : 'ALL';
+$itemsPerPage = 10;
+
+
 try {
     // Attempt PDO connection configuration
     $pdo = new PDO($dsn, $user, $pass, $options);
     $connected = true;
 
     // Fetch the 10 most recent telemetry records
-    $stmt = $pdo->query("SELECT * FROM sensor_readings ORDER BY received_at DESC LIMIT 10");
+    $stmt = $pdo->query("SELECT * FROM sensor_readings WHERE device_id = $selectedDevice ORDER BY recorded_at DESC LIMIT $itemsPerPage");
     $readings = $stmt->fetchAll();
 
 } catch (\PDOException $e) {
     $errorMsg = $e->getMessage();
 }
+
+$deviceStatesStmt = $pdo->query("SELECT DISTINCT device_id FROM sensor_readings");
+$availableDevices = $deviceStatesStmt->fetchALL(PDO::FETCH_COLUMN);
+print_r($availableDevices);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -74,10 +82,8 @@ try {
                 <tr>
                     <th>ID</th>
                     <th>Device ID</th>
-                    <th>Sequence</th>
-                    <th>Temperature (°C)</th>
-                    <th>Humidity (%)</th>
-                    <th>Received At</th>
+                    <th>Sensor Value</th>
+                    <th>Rec At</th>
                 </tr>
             </thead>
             <tbody>
@@ -85,10 +91,8 @@ try {
                     <tr>
                         <td><?= htmlspecialchars($row['id']) ?></td>
                         <td><?= htmlspecialchars($row['device_id']) ?></td>
-                        <td><?= htmlspecialchars($row['sequence']) ?></td>
-                        <td><?= htmlspecialchars(number_format($row['temperature'], 1)) ?></td>
-                        <td><?= htmlspecialchars(number_format($row['humidity'], 1)) ?></td>
-                        <td><?= htmlspecialchars($row['received_at']) ?></td>
+                        <td><?= htmlspecialchars($row['sensor_value']) ?></td>
+                        <td><?= htmlspecialchars($row['recorded_at']) ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>
