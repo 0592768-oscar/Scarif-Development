@@ -1,260 +1,273 @@
 <?php
+// src/index.php - System Landing Page & Navigation Hub
 require_once 'auth.php';
 
-// Pass an array of all roles allowed to view this page
-authorise(['admin', 'staff', 'unauth']);
-?>
-
-// Page code continues below...
-
-<?php
-// Extrapolate environment configurations assigned via Docker Compose
-$host = getenv('DB_HOST') ?: 'localhost';
-$port = getenv('DB_PORT') ?: '3306';
-$db   = getenv('DB_NAME') ?: 'telemetry_db';
-$user = getenv('DB_USER') ?: 'student_user';
-$pass = getenv('DB_PASSWORD') ?: 'Password123!';
-$charset = 'utf8mb4';
-
-$dsn = "mysql:host=$host;port=$port;dbname=$db;charset=$charset";
-$options = [
-    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    PDO::ATTR_EMULATE_PREPARES   => false,
-];
-
-$connected = false;
-$errorMsg = "";
-$readings = [];
-$logs = [];
-
-$selectedDevice = isset($_GET['device_id']) ? trim($_GET['device_id']) : 'ALL';
-$itemsPerPage = 10;
+authorise(['admin', 'guest', 'student', 'staff', 'unauth']);
 
 
-try {
-    // Attempt PDO connection configuration
-    $pdo = new PDO($dsn, $user, $pass, $options);
-    $connected = true;
+session_start();
 
-    // 1. Fetch the 10 most recent telemetry records
-    if ($selectedDevice !== 'ALL' && !empty($selectedDevice)) {
-        $stmt = $pdo->query("SELECT * FROM sensor_readings WHERE device_id = $selectedDevice ORDER BY recorded_at DESC LIMIT $itemsPerPage");
-    } else {
-        $stmt = $pdo->query("SELECT * FROM sensor_readings ORDER BY recorded_at DESC LIMIT $itemsPerPage");
-    }
-    $readings = $stmt->fetchAll();
 
-    // 2. Fetch the 10 most recent event logs using the same device filter
-    if ($selectedDevice !== 'ALL' && !empty($selectedDevice)) {
-        $eventStmt = $pdo->query("SELECT * FROM event_logs WHERE device_id = '$selectedDevice' ORDER BY logged_at DESC LIMIT $itemsPerPage");
-    } else {
-        $eventStmt = $pdo->query("SELECT * FROM event_logs ORDER BY logged_at DESC LIMIT $itemsPerPage");
-    }
-    $logs = $eventStmt->fetchAll();
-} catch (\PDOException $e) {
-    $errorMsg = $e->getMessage();
-}
 
-$deviceStatesStmt = $pdo->query("
-    SELECT DISTINCT device_id FROM (
-        SELECT device_id FROM sensor_readings
-        UNION
-        SELECT device_id FROM event_logs
-        UNION
-        SELECT device_id FROM devices
-    ) AS combined_devices ORDER BY device_id ASC
-");
-$availableDevices = $deviceStatesStmt->fetchAll(PDO::FETCH_COLUMN);
-print_r($availableDevices);
+$isLoggedIn = isset($_SESSION['user_id']);
+$firstName  = $isLoggedIn ? ($_SESSION['first_name'] ?? 'User') : '';
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-AU">
 
 <head>
     <meta charset="UTF-8">
-    <title>IoT Live Telemetry Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Central System - Overview</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 2rem;
             background: #f4f6f9;
-            color: #333;
-            margin: 40px;
+            color: #2c3e50;
+            line-height: 1.6;
         }
 
         .container {
-            max-width: 900px;
+            max-width: 1000px;
             margin: 0 auto;
-            background: white;
-            padding: 30px;
+        }
+
+        header {
+            background: #ffffff;
+            padding: 2rem;
             border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            margin-bottom: 2rem;
+            border-left: 6px solid #0056b3;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
         }
 
-        h1 {
-            color: #2c3e50;
-            border-bottom: 2px solid #ecf0f1;
-            padding-bottom: 15px;
+        .header-title h1 {
+            margin: 0 0 0.5rem 0;
+            color: #1a252f;
+            font-size: 2rem;
         }
 
-        .status {
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            font-weight: bold;
+        .header-title .lead {
+            font-size: 1.1rem;
+            color: #555;
+            margin: 0;
         }
 
-        .status.success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+        .user-greeting {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
         }
 
-        .status.danger {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+        .welcome-text {
+            font-weight: 600;
+            color: #1a252f;
         }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
+        .auth-buttons {
+            display: flex;
+            gap: 0.75rem;
         }
 
-        th,
-        td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
         }
 
-        th {
-            background-color: #f8f9fa;
-            color: #2c3e50;
+        .card {
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
-        tr:hover {
-            background-color: #f1f1f1;
+        .card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            margin: 0 0 0.75rem 0;
+            font-size: 1.3rem;
+            color: #0056b3;
+        }
+
+        .card p {
+            margin: 0 0 1.25rem 0;
+            color: #666;
+            font-size: 0.95rem;
+            flex-grow: 1;
+        }
+
+        .btn {
+            display: inline-block;
+            background: #0056b3;
+            color: #ffffff;
+            text-decoration: none;
+            padding: 10px 18px;
+            border-radius: 5px;
+            font-weight: 600;
+            text-align: center;
+            transition: background 0.2s ease;
+        }
+
+        .btn:hover {
+            background: #004085;
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: #0056b3;
+            border: 2px solid #0056b3;
+        }
+
+        .btn-outline:hover {
+            background: #0056b3;
+            color: #ffffff;
+        }
+
+        .btn-danger {
+            background: #8b0000;
+            color: #ffffff;
+        }
+
+        .btn-danger:hover {
+            background: #a00000;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: #ffffff;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .info-panel {
+            background: #ffffff;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+
+        .info-panel h3 {
+            margin-top: 0;
+            color: #1a252f;
+        }
+
+        .info-panel ul {
+            margin: 0;
+            padding-left: 1.2rem;
+            color: #555;
+        }
+
+        .info-panel li {
+            margin-bottom: 0.5rem;
+        }
+
+        code {
+            background: #eef2f7;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #0056b3;
+            font-size: 0.9em;
         }
     </style>
 </head>
 
 <body>
+
     <div class="container">
-        <h1>Live Telemetry Dashboard</h1>
-
-        <!-- Connectivity Diagnostics Display -->
-        <?php if ($connected): ?>
-            <div class="status success">
-                ✓ Successfully connected to Centralised Database on host: <?= htmlspecialchars($host) ?>
+        <header>
+            <div class="header-title">
+                <h1>IoT Central System Hub</h1>
+                <p class="lead">Central management and monitoring platform for student ESP32 microcontroller telemetry.</p>
             </div>
-        <?php else: ?>
-            <div class="status danger">
-                ✗ Database Connection Failed!<br>
-                <small>Error: <?= htmlspecialchars($errorMsg) ?></small>
-            </div>
-        <?php endif; ?>
 
-        <h2>Recent Sensor Readings</h2>
-        <?php if (empty($readings)): ?>
-            <p>No telemetry data found in the database. Ensure the ESP32 is actively publishing data.</p>
-        <?php else: ?>
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Device ID</th>
-                        <th>Sensor Value</th>
-                        <th>Rec At</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($readings as $row): ?>
-                        <tr>
-                            <td><?= htmlspecialchars($row['id']) ?></td>
-                            <td><?= htmlspecialchars($row['device_id']) ?></td>
-                            <td><?= htmlspecialchars($row['sensor_value']) ?></td>
-                            <td><?= htmlspecialchars($row['recorded_at']) ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
-        <!-- Recent Event Logs Table -->
-        <h2>Recent Event Logs</h2>
-        <?php if (empty($logs)): ?>
-            <p>No event logs found for the selected criteria.</p>
-        <?php else: ?>
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 10%;">ID</th>
-                        <th style="width: 25%;">Device ID</th>
-                        <th style="width: 40%;">Event Message</th>
-                        <th style="width: 25%;">Logged At</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($logs as $log): ?>
-                        <tr>
-                            <td><?= htmlspecialchars($log['id']) ?></td>
-                            <td><code><?= htmlspecialchars($log['device_id']) ?></code></td>
-                            <td><?= htmlspecialchars($log['event_message']) ?></td>
-                            <td><?= htmlspecialchars($log['logged_at']) ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
+            <!-- Conditional Header Navigation -->
+            <?php if ($isLoggedIn): ?>
+                <div class="user-greeting">
+                    <span class="welcome-text">Welcome, <?= htmlspecialchars($firstName) ?></span>
+                    <a href="logout.php" class="btn btn-secondary">Log Out</a>
+                </div>
+            <?php else: ?>
+                <div class="auth-buttons">
+                    <a href="login.php" class="btn btn-outline">Log In</a>
+                    <a href="register.php" class="btn">Register</a>
+                </div>
+            <?php endif; ?>
+        </header>
+
+        <div class="grid">
+            <!-- Telemetry Data Link Card -->
+            <div class="card">
+                <div>
+                    <h2>Telemetry & Device Controller</h2>
+                    <p>View real-time sensor readings, event logs, device activity filters, and update active state values (0 or 1).</p>
+                </div>
+                <a href="data.php" class="btn">View Telemetry Data &rarr;</a>
+            </div>
+
+            <!-- User Account Card (Dynamic State) -->
+            <div class="card">
+                <div>
+                    <h2>Account Access</h2>
+                    <?php if ($isLoggedIn): ?>
+                        <p>You are logged in as <strong><?= htmlspecialchars($firstName) ?></strong>. Manage your account settings or log out when finished.</p>
+                    <?php else: ?>
+                        <p>Log in to access administrative privileges or create a new user account to get started with device tracking.</p>
+                    <?php endif; ?>
+                </div>
+
+                <?php if ($isLoggedIn): ?>
+                    <a href="logout.php" class="btn btn-secondary">Log Out</a>
+                <?php else: ?>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <a href="login.php" class="btn btn-outline" style="flex: 1;">Log In</a>
+                        <a href="register.php" class="btn" style="flex: 1;">Register</a>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <!-- Error Logs Card -->
+            <div class="card">
+                <div>
+                    <h2>System Error Logs</h2>
+                    <p>Inspect captured system exceptions, database connection errors, and telemetry transport logs stored in <code>error_log</code>.</p>
+                </div>
+                <a href="errorlog.php" class="btn btn-danger">View Error Logs &rarr;</a>
+            </div>
+        </div>
+
+        <!-- Infrastructure Architecture Summary -->
+        <div class="info-panel">
+            <h3>System Architecture Overview</h3>
+            <ul>
+                <li><strong>Scarif Development:</strong> Houses edge IoT hardware (ESP32) and the client Web Portal interface.</li>
+                <li><strong>Scarif Production Server:</strong> Hosts the MQTT Broker, <code>bridge.py</code> sync daemon, and MySQL Database.</li>
+            </ul>
+        </div>
     </div>
+
 </body>
 
 </html>
-
-<!-- Device State Control Form -->
-<div class="card">
-    <h2>Device State Controller</h2>
-    <form method="POST" action="index.php">
-        <input type="hidden" name="action" value="update_state">
-        <div class="form-row">
-            <div>
-                <label for="target_device_id" style="font-weight: bold; display: block;">Device ID:</label>
-                <input type="text" name="target_device_id" id="target_device_id" placeholder="e.g. ESP32-01" required list="device-list">
-                <datalist id="device-list">
-                    <?php foreach ($availableDevices as $dev): ?>
-                        <option value="<?= htmlspecialchars($dev) ?>">
-                        <?php endforeach; ?>
-                </datalist>
-            </div>
-            <div>
-                <label for="state_value" style="font-weight: bold; display: block;">State Value:</label>
-                <select name="state_value" id="state_value">
-                    <option value="1">1 (ON / Active)</option>
-                    <option value="0">0 (OFF / Inactive)</option>
-                </select>
-            </div>
-            <div>
-                <button type="submit" class="btn-submit">Update State</button>
-            </div>
-        </div>
-    </form>
-</div>
-
-<!-- Filter Control -->
-<div class="card filter-card">
-    <label for="deviceFilter">Filter Telemetry by Device:</label>
-    <form method="GET" action="index.php" id="filterForm">
-        <select name="device_id" id="deviceFilter" onchange="document.getElementById('filterForm').submit();">
-            <option value="ALL" <?= $selectedDevice === 'ALL' ? 'selected' : '' ?>>-- All Devices --</option>
-            <?php foreach ($availableDevices as $dev): ?>
-                <option value="<?= htmlspecialchars($dev) ?>" <?= $selectedDevice === $dev ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($dev) ?>
-                </option>
-            <?php endforeach; ?>
-        </select>
-    </form>
-    <?php if ($selectedDevice !== 'ALL'): ?>
-        <a href="index.php" class="reset-link">&times; Clear Filter</a>
-    <?php endif; ?>
-</div>

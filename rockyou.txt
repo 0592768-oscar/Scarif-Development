@@ -9,6 +9,7 @@ rockyou
 12345678
 abc123
 nicole
+Password123!
 daniel
 babygirl
 monkey

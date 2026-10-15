@@ -1,13 +1,9 @@
 <?php
+
 require_once 'auth.php';
 
-// Pass an array of all roles allowed to view this page
-authorise(['admin', 'staff', 'student', 'guest', 'unauth']);
-?>
+authorise(['admin', 'guest', 'student', 'staff', 'unauth']);
 
-// Page code continues below...
-
-<?php
 // Start output buffering and session management
 ob_start();
 if (session_status() === PHP_SESSION_NONE) {
@@ -173,3 +169,4 @@ try {
 </html>
 <?php
 ob_end_flush();
+?>
